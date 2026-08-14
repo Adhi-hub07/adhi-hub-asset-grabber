@@ -351,7 +351,7 @@ def download_asset(asset_id, ext, name, thumb, type_name=None, info=None):
     elif not cookie:
         hint = ("\n[yellow]💡 This asset is login-only (private / restricted).\n"
                 "   Normal assets need NO login. For private ones: Settings → Set cookie.\n"
-                "   Type 9 (Help) to see the 1-minute guide.[/yellow]")
+                "   Type h (Help) to see the 1-minute guide.[/yellow]")
     console.print(f"[red]❌ Download failed: {err}{hint}[/red]")
     return False
 
@@ -387,6 +387,82 @@ def pick_items_table(title, items):
         if p.isdigit() and 1 <= int(p) <= min(len(items), 15):
             ids.append(items[int(p) - 1]["id"])
     return ids
+
+
+def extract_place_asset_ids(data):
+    import zlib
+    ids = set()
+    text = data.decode("utf-8", "ignore")
+    ids |= set(int(x) for x in re.findall(r"rbxassetid://(\d+)", text))
+
+    i = 0
+    while True:
+        j = data.find(b"\x78", i)
+        if j < 0 or j > len(data) - 2:
+            break
+        if data[j + 1] in (0x01, 0x5E, 0x9C, 0xDA):
+            for wbits in (15, -15, 31):
+                try:
+                    dec = zlib.decompressobj(wbits)
+                    chunk = dec.decompress(data[j:j + 400000], 400000)
+                    ids |= set(int(x) for x in re.findall(rb"rbxassetid://(\d+)", chunk))
+                except Exception:
+                    continue
+        i = j + 1
+    return sorted(ids)
+
+
+def game_mode():
+    console.print("[dim]Paste a game/place ID (or roblox.com/games/... link):[/dim]")
+    raw = input("➜  ").strip()
+    m = re.search(r"roblox\.com/games/(\d+)", raw)
+    place_id = int(m.group(1)) if m else (int(raw) if raw.isdigit() else None)
+    if not place_id:
+        console.print("[red]❌ That doesn't look like a game ID.[/red]")
+        return
+
+    with console.status("[cyan]Fetching game info..."):
+        info = lookup(place_id)
+    if not info:
+        console.print("[red]❌ Game not found.[/red]")
+        return
+    name = info.get("Name") or f"Game {place_id}"
+    creator = (info.get("Creator") or {}).get("Name", "?")
+    desc = (info.get("Description") or "")[:160]
+    t = Table(show_header=False, box=None, padding=(0, 2))
+    t.add_column(style="bold cyan", width=14)
+    t.add_column(style="white")
+    t.add_row("Game", f"[bold]{name}[/bold]")
+    t.add_row("Place ID", str(place_id))
+    t.add_row("Creator", creator)
+    if desc:
+        t.add_row("Description", desc)
+    console.print(Panel(t, title="🎮 Game", border_style="magenta"))
+
+    with console.status("[cyan]Downloading the game file..."):
+        data, err = download_bytes(place_id, load_cookie())
+    if not data or len(data) < 100:
+        console.print(f"[red]❌ Couldn't download the game file ({err}).[/red]")
+        console.print("[yellow]Roblox now blocks game-file downloads for most games — only games\n"
+                      "   with 'Copying Allowed' still work. Nothing you can do about it.[/yellow]")
+        return
+
+    with console.status("[cyan]Scanning for asset IDs inside the game..."):
+        ids = extract_place_asset_ids(data)
+    if not ids:
+        console.print("[yellow]No asset IDs found in the game file.[/yellow]")
+        return
+    console.print(f"[green]🔍 Found [bold]{len(ids)}[/bold] unique asset ID(s) inside the game![/green]")
+    console.print(f"[dim]First 20: {', '.join(str(x) for x in ids[:20])}[/dim]")
+
+    if input(f"\n⬇ Download all {len(ids)} assets? [y/N] ").strip().lower() in ("y", "yes"):
+        ok = 0
+        for i, aid in enumerate(ids, 1):
+            console.rule(f"[{i}/{len(ids)}] Asset #{aid}")
+            if grab_one(aid, auto_dl=True):
+                ok += 1
+        console.rule()
+        console.print(f"[green]✅ Done: {ok}/{len(ids)} downloaded.[/green]")
 
 
 def search_assets():
@@ -606,31 +682,35 @@ def main_loop():
                       "[bold cyan]2)[/bold cyan] Batch mode   "
                       "[bold cyan]3)[/bold cyan] 📄 Import .txt file   "
                       "[bold cyan]4)[/bold cyan] 👤 Creator mode\n"
-                      "  [bold cyan]5)[/bold cyan] 🔎 Search keyword   "
-                      "[bold cyan]6)[/bold cyan] History   "
-                      "[bold cyan]7)[/bold cyan] ⚙ Settings   "
-                      "[bold cyan]8)[/bold cyan] Open folder   "
-                      "[bold cyan]9)[/bold cyan] ℹ Help   "
+                      "  [bold cyan]5)[/bold cyan] 🎮 Game → find assets   "
+                      "[bold cyan]6)[/bold cyan] 🔎 Search keyword   "
+                      "[bold cyan]7)[/bold cyan] History   "
+                      "[bold cyan]8)[/bold cyan] ⚙ Settings   "
+                      "[bold cyan]9)[/bold cyan] Open folder   "
+                      "[bold cyan]h)[/bold cyan] ℹ Help   "
                       "[bold cyan]0)[/bold cyan] Exit")
-        choice = input("\n➜  ").strip()
+        choice = input("\n➜  ").strip().lower()
         if choice == "0":
             console.print("[dim]Bye! — ADHI-HUB[/dim]")
             break
-        if choice == "9":
+        if choice == "h":
             show_help()
             continue
-        if choice == "8":
+        if choice == "9":
             os.makedirs(DOWNLOADS, exist_ok=True)
             os.startfile(DOWNLOADS) if os.name == "nt" else console.print(f"📁 {DOWNLOADS}")
             continue
-        if choice == "7":
+        if choice == "8":
             settings_menu()
             continue
-        if choice == "6":
+        if choice == "7":
             show_history()
             continue
-        if choice == "5":
+        if choice == "6":
             search_assets()
+            continue
+        if choice == "5":
+            game_mode()
             continue
         if choice == "4":
             creator_mode()
