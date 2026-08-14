@@ -321,9 +321,13 @@ def download_asset(asset_id, ext, name, thumb, type_name=None, info=None):
 
     hint = ""
     if not cookie and type_name in ("Audio",):
-        hint = "\n💡 [yellow]Audio needs your login! Open [bold]Settings → Set cookie[/bold] and paste\n   your .ROBLOSECURITY cookie — then private & music assets download.[/yellow]"
+        hint = ("\n💡 [yellow]MUSIC assets need your login.[/yellow]\n"
+                "   Normal assets (hats, decals, images) work WITHOUT login.\n"
+                "   For music/private: Settings → Set cookie → paste .ROBLOSECURITY → done.[/yellow]")
     elif not cookie:
-        hint = "\n💡 [yellow]Login-only asset. Open [bold]Settings → Set cookie[/bold] with your\n   .ROBLOSECURITY to unlock it (audio, private, your uploads).[/yellow]"
+        hint = ("\n💡 [yellow]This asset is login-only (private / restricted).[/yellow]\n"
+                "   Normal assets need NO login. For private ones: Settings → Set cookie.\n"
+                "   Type [bold]6 (Help)[/bold] to see the 1-minute guide.[/yellow]")
     console.print(f"[red]❌ Download failed: {err}{hint}[/red]")
     return False
 
@@ -337,6 +341,26 @@ def grab_one(aid, auto_dl=False):
     save_history(aid, name, type_name or "?")
     if auto_dl or input("\n⬇ Download the file? [y/N] ").strip().lower() in ("y", "yes"):
         download_asset(aid, ext or ".bin", name, thumb, type_name, info)
+    console.print()
+
+
+def show_help():
+    console.print(Panel(
+        "[bold green]✅ NORMAL assets — NO login needed[/bold green]\n"
+        "   Hats, decals, images, shirts, faces, gear, animations...\n"
+        "   → Just paste the ID and download. Works instantly.\n\n"
+        "[bold yellow]🔒 PRIVATE / MUSIC assets — needs your cookie[/bold yellow]\n"
+        "   Audio (music IDs), private uploads, limited items...\n"
+        "   → Roblox requires a login to grab these.\n\n"
+        "[bold cyan]🔑 HOW TO GET YOUR COOKIE (1 minute)[/bold cyan]\n"
+        "   1. Open roblox.com in Chrome (logged in)\n"
+        "   2. Press F12 → click the \"Application\" tab\n"
+        "   3. Cookies → https://www.roblox.com\n"
+        "   4. Find \".ROBLOSECURITY\" → copy its value\n"
+        "   5. In this app: Settings → Set cookie → paste it\n"
+        "   → Done! Private & music assets now download.\n\n"
+        "[dim]🛡 Your cookie stays on YOUR device only (cookie.txt, never shared).[/dim]",
+        title="ℹ HOW IT WORKS", border_style="green"))
     console.print()
 
 
@@ -423,11 +447,15 @@ def main_loop():
                       "[bold cyan]3)[/bold cyan] History   "
                       "[bold cyan]4)[/bold cyan] ⚙ Settings   "
                       "[bold cyan]5)[/bold cyan] Open folder   "
+                      "[bold cyan]6)[/bold cyan] ℹ Help   "
                       "[bold cyan]0)[/bold cyan] Exit")
         choice = input("\n➜  ").strip()
         if choice == "0":
             console.print("[dim]Bye! — ADHI-HUB[/dim]")
             break
+        if choice == "6":
+            show_help()
+            continue
         if choice == "5":
             os.makedirs(DOWNLOADS, exist_ok=True)
             os.startfile(DOWNLOADS) if os.name == "nt" else console.print(f"📁 {DOWNLOADS}")

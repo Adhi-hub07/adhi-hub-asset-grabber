@@ -74,14 +74,18 @@ All files land in **`Downloads/ADHI-HUB Assets`** — one place for everything.
 
 ---
 
-## 🔓 Unlock everything with your login (optional)
+## 🔓 When do you need the login cookie?
 
-Some assets (audio, private uploads) need a Roblox login to download directly.
-**Do it right inside the app:** `Settings → Set cookie` → paste your `.ROBLOSECURITY`
-cookie (browser DevTools → Application → Cookies → `.ROBLOSECURITY`).
+| Asset type | Login needed? |
+|------------|----------------|
+| ✅ **Normal** — hats, decals, images, shirts, faces, gear, animations | **No** — paste ID, download instantly |
+| 🔒 **Private / Music** — audio (music IDs), private uploads, limited items | **Yes** — set your cookie in Settings |
 
-That unlocks **private assets, any music ID, and your own uploads**.
-The cookie is stored locally in `cookie.txt` (gitignored — never shared).
+**Set the cookie right inside the app:** `4) Settings → Set cookie` → paste your
+`.ROBLOSECURITY` value (browser DevTools → Application → Cookies → `.ROBLOSECURITY`),
+or press **`6) Help`** in the app for the full 1-minute guide.
+
+Your cookie stays on YOUR device only (`cookie.txt`, gitignored — never shared).
 
 ---
 
