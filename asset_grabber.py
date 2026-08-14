@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -20,6 +21,8 @@ console = Console()
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 HISTORY = os.path.join(APP_DIR, "history.json")
+SETTINGS = os.path.join(APP_DIR, "settings.json")
+COOKIE_FILE = os.path.join(APP_DIR, "cookie.txt")
 DOWNLOADS = os.path.join(os.path.expanduser("~"), "Downloads", "ADHI-HUB Assets")
 PREVIEWS = os.path.join(DOWNLOADS, "_previews")
 
@@ -75,6 +78,28 @@ ASSET_TYPES = {
 }
 
 
+def load_settings():
+    try:
+        return json.load(open(SETTINGS, encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def save_settings(s):
+    json.dump(s, open(SETTINGS, "w", encoding="utf-8"), indent=2)
+
+
+def thumb_size():
+    return int(load_settings().get("thumb_size", 420))
+
+
+def load_cookie():
+    if os.path.exists(COOKIE_FILE):
+        c = open(COOKIE_FILE, encoding="utf-8").read().strip()
+        return c or None
+    return None
+
+
 def fetch_json(url):
     req = urllib.request.Request(url, headers=UA)
     with urllib.request.urlopen(req, timeout=20) as r:
@@ -108,14 +133,6 @@ def download_bytes(asset_id, cookie=None):
     return None, last_err
 
 
-def load_cookie():
-    p = os.path.join(APP_DIR, "cookie.txt")
-    if os.path.exists(p):
-        c = open(p, encoding="utf-8").read().strip()
-        return c or None
-    return None
-
-
 def human_size(n):
     for unit in ("B", "KB", "MB", "GB"):
         if n < 1024:
@@ -124,14 +141,16 @@ def human_size(n):
     return f"{n:.1f} TB"
 
 
-def extract_id(text):
+def extract_ids(text):
+    ids = []
     m = re.search(r"roblox\.com/(?:catalog|library)/(\d+)", text)
     if m:
-        return int(m.group(1)), True
-    t = text.strip().replace(",", "").replace(" ", "")
-    if t.isdigit():
-        return int(t), False
-    return None, False
+        ids.append(int(m.group(1)))
+    for t in re.split(r"[,;\s]+", text):
+        t = t.strip()
+        if t.isdigit():
+            ids.append(int(t))
+    return list(dict.fromkeys(ids))
 
 
 def lookup(asset_id):
@@ -154,7 +173,8 @@ def lookup(asset_id):
 
 def get_thumbnail(asset_id):
     try:
-        data = fetch_json(f"https://thumbnails.roblox.com/v1/assets?assetIds={asset_id}&size=420x420&format=Png&isCircular=false")
+        size = thumb_size()
+        data = fetch_json(f"https://thumbnails.roblox.com/v1/assets?assetIds={asset_id}&size={size}x{size}&format=Png&isCircular=false")
         url = (data.get("data") or [{}])[0].get("imageUrl")
         if url:
             return fetch_bytes(url)
@@ -167,13 +187,29 @@ def safe_name(name):
     return re.sub(r'[\\/*?:"<>|]', "_", name or "asset")[:80]
 
 
+def copy_clipboard(text):
+    try:
+        if os.name == "nt":
+            subprocess.run(["clip"], input=text.encode("utf-16-le"), check=True)
+        else:
+            for cmd in (["xclip", "-selection", "clipboard"], ["xsel", "-b"]):
+                try:
+                    subprocess.run(cmd, input=text.encode("utf-8"), check=True)
+                    return True
+                except Exception:
+                    continue
+        return True
+    except Exception:
+        return False
+
+
 def show_info(asset_id, info):
     if not info:
         console.print(Panel(f"[yellow]Could not fetch details for asset [bold]#{asset_id}[/bold][/yellow]\n"
                             f"[dim]It may be deleted, private, or not in the catalog.[/dim]\n"
                             f"[dim]You can still try downloading the raw file.[/dim]",
                             title=f"⚠ No details", border_style="yellow"))
-        return None, None
+        return None, None, None
 
     aid = info.get("id") or info.get("assetId") or asset_id
     name = info.get("Name") or info.get("name") or f"Asset {aid}"
@@ -192,6 +228,7 @@ def show_info(asset_id, info):
     price = info.get("PriceInRobux") or info.get("price") or 0
     sales = info.get("Sales") or info.get("sales") or 0
     created = (info.get("Created") or info.get("created") or "?").split("T")[0]
+    link = f"https://www.roblox.com/library/{aid}"
 
     t = Table(show_header=False, box=None, padding=(0, 2))
     t.add_column(style="bold cyan", width=14)
@@ -202,11 +239,16 @@ def show_info(asset_id, info):
     t.add_row("Price", f"🪙 {price} Robux" if price else "Free")
     t.add_row("Sales", str(sales))
     t.add_row("Created", created)
-    t.add_row("Roblox", f"https://www.roblox.com/library/{aid}")
+    t.add_row("Roblox", link)
     if desc:
         t.add_row("Description", desc[:220])
     console.print(Panel(t, title=f"🎮 Asset #{aid}", border_style="magenta"))
-    return type_name, ext
+
+    if input("\n📋 Copy the asset link? [y/N] ").strip().lower() in ("y", "yes"):
+        copy_clipboard(link)
+        console.print("[green]✅ Link copied to clipboard[/green]")
+
+    return type_name, ext, info
 
 
 def save_history(asset_id, name, type_name):
@@ -220,7 +262,35 @@ def save_history(asset_id, name, type_name):
     json.dump(hist[:50], open(HISTORY, "w", encoding="utf-8"), indent=2)
 
 
-def download_asset(asset_id, ext, name, thumb, type_name=None):
+def save_metadata(asset_id, info, path):
+    if not info:
+        return
+    name = info.get("Name") or info.get("name") or ""
+    desc = info.get("Description") or info.get("description") or ""
+    atype = info.get("AssetTypeId") or "?"
+    creator = info.get("Creator") or {}
+    price = info.get("PriceInRobux") or info.get("price") or 0
+    sales = info.get("Sales") or info.get("sales") or 0
+    created = (info.get("Created") or info.get("created") or "?")
+    lines = [
+        f"Asset ID      : {asset_id}",
+        f"Name          : {name}",
+        f"Type          : {atype}",
+        f"Creator       : {creator.get('Name', '?')}",
+        f"Price         : {price} Robux",
+        f"Sales         : {sales}",
+        f"Created       : {created}",
+        f"Link          : https://www.roblox.com/library/{asset_id}",
+        f"Description   : {desc}" if desc else "",
+    ]
+    try:
+        meta_path = os.path.splitext(path)[0] + ".txt"
+        open(meta_path, "w", encoding="utf-8").write("\n".join(lines))
+    except Exception:
+        pass
+
+
+def download_asset(asset_id, ext, name, thumb, type_name=None, info=None):
     os.makedirs(DOWNLOADS, exist_ok=True)
     os.makedirs(PREVIEWS, exist_ok=True)
     if thumb:
@@ -236,23 +306,93 @@ def download_asset(asset_id, ext, name, thumb, type_name=None):
     if data and len(data) >= 4:
         path = os.path.join(DOWNLOADS, f"{safe_name(name)}__{asset_id}{ext}")
         open(path, "wb").write(data)
+        save_metadata(asset_id, info, path)
         console.print(f"[green]✅ Saved [bold]{os.path.basename(path)}[/bold] ({human_size(len(data))})[/green]")
         console.print(f"[dim]   📁 {DOWNLOADS}[/dim]")
-        return
+        return True
 
     if thumb and ext == ".png":
         path = os.path.join(DOWNLOADS, f"{safe_name(name)}__{asset_id}.png")
         open(path, "wb").write(thumb)
+        save_metadata(asset_id, info, path)
         console.print(f"[green]✅ Saved image via preview [bold]{os.path.basename(path)}[/bold][/green]")
         console.print(f"[dim]   📁 {DOWNLOADS}[/dim]")
-        return
+        return True
 
     hint = ""
     if not cookie and type_name in ("Audio",):
-        hint = "\n💡 [yellow]Audio downloads need your login: create [bold]cookie.txt[/bold] next to the app\n   and paste your .ROBLOSECURITY cookie inside.[/yellow]"
+        hint = "\n💡 [yellow]Audio needs your login! Open [bold]Settings → Set cookie[/bold] and paste\n   your .ROBLOSECURITY cookie — then private & music assets download.[/yellow]"
     elif not cookie:
-        hint = "\n💡 [yellow]This asset is login-only for direct download. Create [bold]cookie.txt[/bold] with your\n   .ROBLOSECURITY cookie to unlock it (audio, meshes, your own uploads).[/yellow]"
+        hint = "\n💡 [yellow]Login-only asset. Open [bold]Settings → Set cookie[/bold] with your\n   .ROBLOSECURITY to unlock it (audio, private, your uploads).[/yellow]"
     console.print(f"[red]❌ Download failed: {err}{hint}[/red]")
+    return False
+
+
+def grab_one(aid, auto_dl=False):
+    with console.status(f"[cyan]Fetching asset #{aid}..."):
+        info = lookup(aid)
+        thumb = get_thumbnail(aid)
+    type_name, ext, info = show_info(aid, info)
+    name = (info or {}).get("Name") or (info or {}).get("name") or f"asset_{aid}"
+    save_history(aid, name, type_name or "?")
+    if auto_dl or input("\n⬇ Download the file? [y/N] ").strip().lower() in ("y", "yes"):
+        download_asset(aid, ext or ".bin", name, thumb, type_name, info)
+    console.print()
+
+
+def settings_menu():
+    while True:
+        cookie = load_cookie()
+        status = "[green]✅ SET[/green]" if cookie else "[yellow]⚠️ NOT SET[/yellow]"
+        console.print(Panel(f"Cookie (.ROBLOSECURITY): {status}\n"
+                            f"Thumbnail size: [cyan]{thumb_size()}px[/cyan]\n\n"
+                            f"  [bold cyan]1)[/bold cyan] Set cookie      "
+                            f"[bold cyan]2)[/bold cyan] Clear cookie\n"
+                            f"  [bold cyan]3)[/bold cyan] Thumbnail size  "
+                            f"[bold cyan]4)[/bold cyan] Open downloads folder\n"
+                            f"  [bold cyan]0)[/bold cyan] Back",
+                            title="⚙ Settings", border_style="cyan"))
+        c = input("\n➜  ").strip()
+        if c == "0":
+            return
+        if c == "1":
+            console.print("[dim]Paste your .ROBLOSECURITY cookie (from browser DevTools → Cookies):[/dim]")
+            val = input("➜  ").strip()
+            if val:
+                open(COOKIE_FILE, "w", encoding="utf-8").write(val)
+                console.print("[green]✅ Cookie saved! Private & audio assets are now unlocked.[/green]")
+        elif c == "2":
+            try:
+                os.remove(COOKIE_FILE)
+                console.print("[yellow]Cookie cleared.[/yellow]")
+            except OSError:
+                console.print("[yellow]No cookie set.[/yellow]")
+        elif c == "3":
+            s = load_settings()
+            cur = thumb_size()
+            other = 720 if cur == 420 else 420
+            s["thumb_size"] = other
+            save_settings(s)
+            console.print(f"[green]✅ Thumbnails now {other}px.[/green]")
+        elif c == "4":
+            os.makedirs(DOWNLOADS, exist_ok=True)
+            os.startfile(DOWNLOADS) if os.name == "nt" else console.print(f"📁 {DOWNLOADS}")
+        console.print()
+
+
+def batch_mode():
+    console.print("[dim]Paste many asset IDs or links, separated by commas/spaces (one line):[/dim]")
+    raw = input("➜  ").strip()
+    ids = extract_ids(raw)
+    if not ids:
+        console.print("[red]❌ No valid IDs found.[/red]")
+        return
+    console.print(f"[cyan]Found {len(ids)} asset(s).[/cyan]\n")
+    for aid in ids:
+        console.rule(f"Asset #{aid}")
+        grab_one(aid, auto_dl=True)
+    console.rule()
+    console.print(f"[green]✅ Batch done — {len(ids)} asset(s) processed.[/green]")
 
 
 def show_history():
@@ -275,40 +415,40 @@ def show_history():
 
 def main_loop():
     while True:
-        console.print(Panel(BANNER + "\n" + TAGLINE, border_style="magenta"))
-        console.print("  [bold cyan]1)[/bold cyan] Lookup / download an asset   "
-                      "[bold cyan]2)[/bold cyan] History   "
-                      "[bold cyan]3)[/bold cyan] Open folder   "
+        cookie = load_cookie()
+        ck = "[green]🔓 unlocked[/green]" if cookie else "[yellow]🔒 locked[/yellow]"
+        console.print(Panel(BANNER + "\n" + TAGLINE + f"\n[dim]Login: {ck}[/dim]", border_style="magenta"))
+        console.print("  [bold cyan]1)[/bold cyan] Lookup / download   "
+                      "[bold cyan]2)[/bold cyan] Batch mode   "
+                      "[bold cyan]3)[/bold cyan] History   "
+                      "[bold cyan]4)[/bold cyan] ⚙ Settings   "
+                      "[bold cyan]5)[/bold cyan] Open folder   "
                       "[bold cyan]0)[/bold cyan] Exit")
         choice = input("\n➜  ").strip()
         if choice == "0":
             console.print("[dim]Bye! — ADHI-HUB[/dim]")
             break
-        if choice == "3":
+        if choice == "5":
             os.makedirs(DOWNLOADS, exist_ok=True)
             os.startfile(DOWNLOADS) if os.name == "nt" else console.print(f"📁 {DOWNLOADS}")
             continue
-        if choice == "2":
+        if choice == "4":
+            settings_menu()
+            continue
+        if choice == "3":
             show_history()
+            continue
+        if choice == "2":
+            batch_mode()
             continue
 
         console.print("[dim]Paste an asset ID (or roblox.com/catalog/... link):[/dim]")
         raw = input("➜  ").strip()
-        aid, from_url = extract_id(raw)
-        if not aid:
+        ids = extract_ids(raw)
+        if not ids:
             console.print("[red]❌ That doesn't look like an asset ID.[/red]")
             continue
-
-        with console.status(f"[cyan]Fetching asset #{aid}..."):
-            info = lookup(aid)
-            thumb = get_thumbnail(aid)
-        type_name, ext = show_info(aid, info)
-        name = (info or {}).get("Name") or (info or {}).get("name") or f"asset_{aid}"
-        save_history(aid, name, type_name or "?")
-
-        if input("\n⬇ Download the file? [y/N] ").strip().lower() in ("y", "yes"):
-            download_asset(aid, ext or ".bin", name, thumb, type_name)
-        console.print()
+        grab_one(ids[0])
 
 
 def main():

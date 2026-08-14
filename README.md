@@ -17,6 +17,19 @@ Works with **Hats, Decals, Audio, Meshes, Shirts, Pants, Gear, Animations, Plugi
 
 ## 🚀 Quick Start
 
+### Option A — EXE (easiest, for everyone)
+
+No Python. No installs. Just download & double-click.
+
+[![Download EXE](https://img.shields.io/badge/⬇_Download_ADHI--HUB--Asset--Grabber.exe-pink?style=for-the-badge)](https://github.com/Adhi-hub07/adhi-hub-asset-grabber/releases/download/v1.0.0/ADHI-HUB-Asset-Grabber.exe)
+
+**One-line command (Windows PowerShell):**
+```powershell
+irm https://github.com/Adhi-hub07/adhi-hub-asset-grabber/releases/download/v1.0.0/ADHI-HUB-Asset-Grabber.exe -OutFile ADHI-HUB-Asset-Grabber.exe; .\ADHI-HUB-Asset-Grabber.exe
+```
+
+### Option B — Python source
+
 [![Download start.bat](https://img.shields.io/badge/⬇_Download_start.bat-8fd3ff?style=for-the-badge)](https://raw.githubusercontent.com/Adhi-hub07/adhi-hub-asset-grabber/main/start.bat)
 
 ```bash
@@ -63,20 +76,34 @@ All files land in **`Downloads/ADHI-HUB Assets`** — one place for everything.
 
 ## 🔓 Unlock everything with your login (optional)
 
-Some assets (audio, user uploads) need a Roblox login to download directly.
-1. Get your `.ROBLOSECURITY` cookie (browser DevTools → Application → Cookies → `.ROBLOSECURITY`)
-2. Create a file named **`cookie.txt`** next to `asset_grabber.py`
-3. Paste the cookie inside — that's it. (never share it / never commit it — already gitignored)
+Some assets (audio, private uploads) need a Roblox login to download directly.
+**Do it right inside the app:** `Settings → Set cookie` → paste your `.ROBLOSECURITY`
+cookie (browser DevTools → Application → Cookies → `.ROBLOSECURITY`).
+
+That unlocks **private assets, any music ID, and your own uploads**.
+The cookie is stored locally in `cookie.txt` (gitignored — never shared).
 
 ---
+
+## ⚡ What it can do
+
+| Feature | Description |
+|---------|-------------|
+| 🎮 **Asset lookup** | Name, type, creator, price, sales, created + link |
+| 🎵 **Music IDs** | Paste any audio ID → downloads the MP3 (with cookie) |
+| 🔓 **Private assets** | Set your cookie in Settings → grab login-only assets |
+| 📦 **Batch mode** | `13277990, 102611803, 2278114` → grabs all in a row |
+| 📋 **Copy link** | One key → asset URL copied to clipboard |
+| 🏷 **Metadata export** | `.txt` (name/creator/desc/price) saved next to every download |
+| 🖼 **Previews** | Thumbnails saved to `_previews/` (420px or 720px in Settings) |
+| 🕘 **History** | Last 50 lookups |
+| 📁 **One folder** | Everything lands in `Downloads/ADHI-HUB Assets` |
 
 ## 🧑‍💻 Usage
 
 ```
-1) Lookup / download an asset
-2) History        ← last 50 lookups
-3) Open folder    ← your downloads
-0) Exit
+1) Lookup / download   2) Batch mode   3) History
+4) ⚙ Settings          5) Open folder  0) Exit
 ```
 
 ---
