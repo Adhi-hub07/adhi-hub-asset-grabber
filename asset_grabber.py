@@ -110,7 +110,9 @@ def thumb_size():
 
 def load_cookie():
     if os.path.exists(COOKIE_FILE):
-        c = open(COOKIE_FILE, encoding="utf-8").read().strip()
+        c = open(COOKIE_FILE, encoding="utf-8-sig").read().strip()
+        if "|_" in c:
+            c = c.split("|_", 1)[-1]
         return c or None
     return None
 
@@ -335,7 +337,14 @@ def download_asset(asset_id, ext, name, thumb, type_name=None, info=None):
         return True
 
     hint = ""
-    if not cookie and type_name in ("Audio",):
+    err_text = str(err or "")
+    if "403" in err_text or "not authorized" in err_text:
+        hint = ("\n[yellow]💡 This asset is RESTRICTED — the owner (or Roblox) blocked direct\n"
+                "   download for this account. That's the asset's choice, not yours.\n"
+                "   Other IDs usually work — try another![/yellow]")
+    elif "409" in err_text:
+        hint = "\n[yellow]💡 This asset is DELISTED (409) — removed from delivery but still in\n   the catalog. Nothing can download it.[/yellow]"
+    elif not cookie and type_name in ("Audio",):
         hint = ("\n[yellow]💡 MUSIC assets need your login.\n"
                 "   Normal assets (hats, decals, images) work WITHOUT login.\n"
                 "   For music/private: Settings → Set cookie → paste .ROBLOSECURITY → done.[/yellow]")
