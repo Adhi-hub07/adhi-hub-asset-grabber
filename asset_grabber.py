@@ -495,7 +495,7 @@ def show_help():
         "   Hats, decals, images, shirts, faces, gear, animations...\n"
         "   → Just paste the ID and download. Works instantly.\n\n"
         "[bold yellow]🔒 PRIVATE / MUSIC assets — needs your cookie[/bold yellow]\n"
-        "   Audio (music IDs), private uploads, limited items...\n"
+        "   Audio (music IDs), user uploads (meshes/models), private uploads...\n"
         "   → Roblox requires a login to grab these.\n\n"
         "[bold cyan]🔑 HOW TO GET YOUR COOKIE (1 minute)[/bold cyan]\n"
         "   1. Open roblox.com in Chrome (logged in)\n"
@@ -504,6 +504,12 @@ def show_help():
         "   4. Find \".ROBLOSECURITY\" → copy its value\n"
         "   5. In this app: Settings → Set cookie → paste it\n"
         "   → Done! Private & music assets now download.\n\n"
+        "[bold]WHAT YOU CAN GRAB:[/bold]\n"
+        "   • Without login: all normal public assets (instant)\n"
+        "   • With login: EVERYTHING visible on roblox.com —\n"
+        "     all music IDs, all user uploads, all catalog items\n"
+        "   • Nobody can grab: truly private (owner-only) or\n"
+        "     deleted assets — not even with a cookie\n\n"
         "[dim]🛡 Your cookie stays on YOUR device only (cookie.txt, never shared).[/dim]",
         title="ℹ HOW IT WORKS", border_style="green"))
     console.print()
