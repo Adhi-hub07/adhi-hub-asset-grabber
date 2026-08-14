@@ -1,4 +1,8 @@
 __pycache__/
 *.pyc
+build/
+dist/
+*.spec
 history.json
+settings.json
 cookie.txt
