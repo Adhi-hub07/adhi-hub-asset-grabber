@@ -21,11 +21,11 @@ Works with **Hats, Decals, Audio, Meshes, Shirts, Pants, Gear, Animations, Plugi
 
 No Python. No installs. Just download & double-click.
 
-[![Download EXE](https://img.shields.io/badge/⬇_Download_ADHI--HUB--Asset--Grabber.exe-pink?style=for-the-badge)](https://github.com/Adhi-hub07/adhi-hub-asset-grabber/releases/download/v1.0.0/ADHI-HUB-Asset-Grabber.exe)
+[![Download EXE](https://img.shields.io/badge/⬇_Download_ADHI--HUB--Asset--Grabber.exe-pink?style=for-the-badge)](https://github.com/Adhi-hub07/adhi-hub-asset-grabber/releases/download/v1.2.0/ADHI-HUB-Asset-Grabber.exe)
 
 **One-line command (Windows PowerShell):**
 ```powershell
-irm https://github.com/Adhi-hub07/adhi-hub-asset-grabber/releases/download/v1.0.0/ADHI-HUB-Asset-Grabber.exe -OutFile ADHI-HUB-Asset-Grabber.exe; .\ADHI-HUB-Asset-Grabber.exe
+irm https://github.com/Adhi-hub07/adhi-hub-asset-grabber/releases/download/v1.2.0/ADHI-HUB-Asset-Grabber.exe -OutFile ADHI-HUB-Asset-Grabber.exe; .\ADHI-HUB-Asset-Grabber.exe
 ```
 
 ### Option B — Python source
