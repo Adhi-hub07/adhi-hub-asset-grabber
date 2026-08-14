@@ -96,18 +96,39 @@ Your cookie stays on YOUR device only (`cookie.txt`, gitignored — never shared
 | 🎮 **Asset lookup** | Name, type, creator, price, sales, created + link |
 | 🎵 **Music IDs** | Paste any audio ID → downloads the MP3 (with cookie) |
 | 🔓 **Private assets** | Set your cookie in Settings → grab login-only assets |
+| 🔎 **Keyword search** | Search the catalog: "roblox hat" → pick from results |
+| 👤 **Creator mode** | Type a username (or user ID) → grab their creations |
 | 📦 **Batch mode** | `13277990, 102611803, 2278114` → grabs all in a row |
+| 📄 **Import .txt file** | Load hundreds of IDs from a file, download all |
 | 📋 **Copy link** | One key → asset URL copied to clipboard |
 | 🏷 **Metadata export** | `.txt` (name/creator/desc/price) saved next to every download |
 | 🖼 **Previews** | Thumbnails saved to `_previews/` (420px or 720px in Settings) |
+| 🔄 **Update checker** | Tells you when a new version is out |
 | 🕘 **History** | Last 50 lookups |
 | 📁 **One folder** | Everything lands in `Downloads/ADHI-HUB Assets` |
+
+## 📄 .txt file format (for Import)
+
+One ID per line — comments, links and comma lists all work:
+
+```
+# my list (lines starting with # are skipped)
+102611803
+13277990
+https://www.roblox.com/catalog/2278114/Some-Decap
+9128203637, 236455857
+```
+
+It extracts every ID, skips empty/bad lines (and tells you how many),
+then downloads **all of them automatically** — no questions in between.
 
 ## 🧑‍💻 Usage
 
 ```
-1) Lookup / download   2) Batch mode   3) History
-4) ⚙ Settings          5) Open folder  0) Exit
+1) Lookup / download     2) Batch mode     3) 📄 Import .txt file
+4) 👤 Creator mode       5) 🔎 Search      6) History
+7) ⚙ Settings            8) Open folder    9) ℹ Help
+0) Exit
 ```
 
 ---

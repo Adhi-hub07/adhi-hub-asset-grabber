@@ -37,6 +37,21 @@ BANNER = r"""[bold magenta]
     ╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝
 [/bold magenta]"""
 TAGLINE = "[bold]ASSET GRABBER[/bold]  —  paste an asset ID, get everything about it"
+VERSION = "1.2.0"
+
+
+def check_update():
+    try:
+        data = fetch_json("https://api.github.com/repos/Adhi-hub07/adhi-hub-asset-grabber/releases/latest")
+        tag = (data.get("tag_name") or "").lstrip("v")
+        if tag:
+            theirs = tuple(int(x) for x in re.split(r"[.-]", tag) if x.isdigit())
+            mine = tuple(int(x) for x in re.split(r"[.-]", VERSION) if x.isdigit())
+            if theirs > mine:
+                console.print(f"[bold yellow]⬆ New version {tag} available![/bold yellow]")
+                console.print(f"[dim]   Get it: https://github.com/Adhi-hub07/adhi-hub-asset-grabber/releases/latest[/dim]\n")
+    except Exception:
+        pass
 
 ASSET_TYPES = {
     1: ("Image", ".png"),
@@ -203,7 +218,7 @@ def copy_clipboard(text):
         return False
 
 
-def show_info(asset_id, info):
+def show_info(asset_id, info, interactive=True):
     if not info:
         console.print(Panel(f"[yellow]Could not fetch details for asset [bold]#{asset_id}[/bold][/yellow]\n"
                             f"[dim]It may be deleted, private, or not in the catalog.[/dim]\n"
@@ -244,7 +259,7 @@ def show_info(asset_id, info):
         t.add_row("Description", desc[:220])
     console.print(Panel(t, title=f"🎮 Asset #{aid}", border_style="magenta"))
 
-    if input("\n📋 Copy the asset link? [y/N] ").strip().lower() in ("y", "yes"):
+    if interactive and input("\n📋 Copy the asset link? [y/N] ").strip().lower() in ("y", "yes"):
         copy_clipboard(link)
         console.print("[green]✅ Link copied to clipboard[/green]")
 
@@ -321,13 +336,13 @@ def download_asset(asset_id, ext, name, thumb, type_name=None, info=None):
 
     hint = ""
     if not cookie and type_name in ("Audio",):
-        hint = ("\n💡 [yellow]MUSIC assets need your login.[/yellow]\n"
+        hint = ("\n[yellow]💡 MUSIC assets need your login.\n"
                 "   Normal assets (hats, decals, images) work WITHOUT login.\n"
                 "   For music/private: Settings → Set cookie → paste .ROBLOSECURITY → done.[/yellow]")
     elif not cookie:
-        hint = ("\n💡 [yellow]This asset is login-only (private / restricted).[/yellow]\n"
+        hint = ("\n[yellow]💡 This asset is login-only (private / restricted).\n"
                 "   Normal assets need NO login. For private ones: Settings → Set cookie.\n"
-                "   Type [bold]6 (Help)[/bold] to see the 1-minute guide.[/yellow]")
+                "   Type 9 (Help) to see the 1-minute guide.[/yellow]")
     console.print(f"[red]❌ Download failed: {err}{hint}[/red]")
     return False
 
@@ -336,12 +351,142 @@ def grab_one(aid, auto_dl=False):
     with console.status(f"[cyan]Fetching asset #{aid}..."):
         info = lookup(aid)
         thumb = get_thumbnail(aid)
-    type_name, ext, info = show_info(aid, info)
+    type_name, ext, info = show_info(aid, info, interactive=not auto_dl)
     name = (info or {}).get("Name") or (info or {}).get("name") or f"asset_{aid}"
     save_history(aid, name, type_name or "?")
     if auto_dl or input("\n⬇ Download the file? [y/N] ").strip().lower() in ("y", "yes"):
-        download_asset(aid, ext or ".bin", name, thumb, type_name, info)
+        return download_asset(aid, ext or ".bin", name, thumb, type_name, info)
     console.print()
+    return True
+
+
+def pick_items_table(title, items):
+    t = Table(title=title, header_style="bold magenta")
+    t.add_column("#", width=4)
+    t.add_column("ID", style="cyan")
+    t.add_column("Name", style="white", overflow="fold")
+    t.add_column("Type", style="yellow")
+    for i, it in enumerate(items[:15], 1):
+        tn = it.get("assetType", {}).get("name", "?") if isinstance(it.get("assetType"), dict) else "?"
+        t.add_row(str(i), str(it.get("id")), str(it.get("name", "?")), tn)
+    console.print(t)
+    pick = input("\n➜ Pick number(s) or 'all': ").strip().lower()
+    if pick == "all":
+        return [it["id"] for it in items[:15]]
+    ids = []
+    for p in re.split(r"[,;\s]+", pick):
+        if p.isdigit() and 1 <= int(p) <= min(len(items), 15):
+            ids.append(items[int(p) - 1]["id"])
+    return ids
+
+
+def search_assets():
+    console.print("[dim]Search the Roblox catalog — type a keyword:[/dim]")
+    kw = input("➜  ").strip()
+    if not kw:
+        return
+    try:
+        import urllib.parse
+        data = fetch_json("https://catalog.roblox.com/v1/search/items/details?category=All&limit=10&keyword=" + urllib.parse.quote(kw))
+    except Exception as e:
+        console.print(f"[red]❌ Search failed: {e}[/red]")
+        return
+    items = [it for it in (data.get("data") or []) if it.get("id")]
+    if not items:
+        console.print("[yellow]No results for that keyword.[/yellow]")
+        return
+    ids = pick_items_table(f"🔎 Results for '{kw}'", items)
+    if not ids:
+        console.print("[red]❌ No valid picks.[/red]")
+        return
+    console.print(f"[cyan]Grabbing {len(ids)} asset(s)...[/cyan]\n")
+    ok = 0
+    for aid in ids:
+        console.rule(f"Asset #{aid}")
+        if grab_one(aid, auto_dl=True):
+            ok += 1
+    console.rule()
+    console.print(f"[green]✅ Done: {ok}/{len(ids)} downloaded.[/green]")
+
+
+def import_file():
+    console.print("[dim]Drag the .txt file here or type its full path (Enter = ids.txt in this folder):[/dim]")
+    raw = input("➜  ").strip().strip('"')
+    path = raw or os.path.join(APP_DIR, "ids.txt")
+    if not os.path.exists(path):
+        console.print(f"[red]❌ File not found: {path}[/red]")
+        return
+    try:
+        lines = open(path, encoding="utf-8").read().splitlines()
+    except Exception as e:
+        console.print(f"[red]❌ Can't read file: {e}[/red]")
+        return
+    ids, bad = [], 0
+    for ln in lines:
+        found = extract_ids(ln)
+        if found:
+            ids.extend(found)
+        elif ln.strip() and not ln.strip().startswith("#"):
+            bad += 1
+    ids = list(dict.fromkeys(ids))
+    if not ids:
+        console.print("[red]❌ No valid IDs found in that file.[/red]")
+        return
+    console.print(f"[cyan]📄 {os.path.basename(path)} — {len(ids)} ID(s) found, {bad} line(s) skipped (empty/bad).[/cyan]\n")
+    ok = 0
+    for i, aid in enumerate(ids, 1):
+        console.rule(f"[{i}/{len(ids)}] Asset #{aid}")
+        if grab_one(aid, auto_dl=True):
+            ok += 1
+    console.rule()
+    fail = len(ids) - ok
+    if fail:
+        console.print(f"[green]✅ Done: {ok} downloaded, [red]{fail} failed[/red] ({len(ids)} total).[/green]")
+    else:
+        console.print(f"[green]✅ Done: ALL {ok} downloaded successfully! 🎉[/green]")
+
+
+def creator_mode():
+    console.print("[dim]Paste a creator's username (e.g. Roblox) or their user ID:[/dim]")
+    raw = input("➜  ").strip()
+    uid = None
+    if raw.isdigit():
+        uid = int(raw)
+    else:
+        try:
+            body = json.dumps({"usernames": [raw]}).encode()
+            req = urllib.request.Request("https://users.roblox.com/v1/usernames/users", data=body,
+                                         headers={**UA, "Content-Type": "application/json"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                res = json.loads(r.read().decode("utf-8", "replace"))
+            uid = (res.get("data") or [{}])[0].get("id")
+        except Exception as e:
+            console.print(f"[red]❌ Username lookup failed: {e}[/red]")
+            return
+    if not uid:
+        console.print("[red]❌ User not found.[/red]")
+        return
+    try:
+        data = fetch_json(f"https://catalog.roblox.com/v1/search/items/details?category=All&creatorType=User&creatorTargetId={uid}&limit=10")
+    except Exception as e:
+        console.print(f"[red]❌ Couldn't load creations: {e}[/red]")
+        return
+    items = [it for it in (data.get("data") or []) if it.get("id")]
+    if not items:
+        console.print("[yellow]No public creations found for this creator.[/yellow]")
+        return
+    ids = pick_items_table(f"👤 Creations of '{raw}' (user {uid})", items)
+    if not ids:
+        console.print("[red]❌ No valid picks.[/red]")
+        return
+    console.print(f"[cyan]Grabbing {len(ids)} asset(s)...[/cyan]\n")
+    ok = 0
+    for aid in ids:
+        console.rule(f"Asset #{aid}")
+        if grab_one(aid, auto_dl=True):
+            ok += 1
+    console.rule()
+    console.print(f"[green]✅ Done: {ok}/{len(ids)} downloaded.[/green]")
 
 
 def show_help():
@@ -444,27 +589,39 @@ def main_loop():
         console.print(Panel(BANNER + "\n" + TAGLINE + f"\n[dim]Login: {ck}[/dim]", border_style="magenta"))
         console.print("  [bold cyan]1)[/bold cyan] Lookup / download   "
                       "[bold cyan]2)[/bold cyan] Batch mode   "
-                      "[bold cyan]3)[/bold cyan] History   "
-                      "[bold cyan]4)[/bold cyan] ⚙ Settings   "
-                      "[bold cyan]5)[/bold cyan] Open folder   "
-                      "[bold cyan]6)[/bold cyan] ℹ Help   "
+                      "[bold cyan]3)[/bold cyan] 📄 Import .txt file   "
+                      "[bold cyan]4)[/bold cyan] 👤 Creator mode\n"
+                      "  [bold cyan]5)[/bold cyan] 🔎 Search keyword   "
+                      "[bold cyan]6)[/bold cyan] History   "
+                      "[bold cyan]7)[/bold cyan] ⚙ Settings   "
+                      "[bold cyan]8)[/bold cyan] Open folder   "
+                      "[bold cyan]9)[/bold cyan] ℹ Help   "
                       "[bold cyan]0)[/bold cyan] Exit")
         choice = input("\n➜  ").strip()
         if choice == "0":
             console.print("[dim]Bye! — ADHI-HUB[/dim]")
             break
-        if choice == "6":
+        if choice == "9":
             show_help()
             continue
-        if choice == "5":
+        if choice == "8":
             os.makedirs(DOWNLOADS, exist_ok=True)
             os.startfile(DOWNLOADS) if os.name == "nt" else console.print(f"📁 {DOWNLOADS}")
             continue
-        if choice == "4":
+        if choice == "7":
             settings_menu()
             continue
-        if choice == "3":
+        if choice == "6":
             show_history()
+            continue
+        if choice == "5":
+            search_assets()
+            continue
+        if choice == "4":
+            creator_mode()
+            continue
+        if choice == "3":
+            import_file()
             continue
         if choice == "2":
             batch_mode()
@@ -481,6 +638,7 @@ def main_loop():
 
 def main():
     try:
+        check_update()
         main_loop()
     except KeyboardInterrupt:
         console.print("\n[dim]Bye! — ADHI-HUB[/dim]")
